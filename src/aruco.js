@@ -28,6 +28,11 @@ References:
 
 var AR = AR || {};
 
+//Size of the marker
+var markerSize = 9;
+//Size of the data matrix (marker size - border size)
+var markerDataSize = 7;
+
 AR.Marker = function(id, corners){
   this.id = id;
   this.corners = corners;
@@ -53,7 +58,8 @@ AR.Detector.prototype.detect = function(image){
   this.candidates = this.clockwiseCorners(this.candidates);
   this.candidates = this.notTooNear(this.candidates, 10);
 
-  return this.findMarkers(this.grey, this.candidates, 49);
+  //return this.findMarkers(this.grey, this.candidates, 49);
+  return this.findMarkers(this.grey, this.candidates, markerSize * markerSize);
 };
 
 AR.Detector.prototype.findCandidates = function(contours, minSize, epsilon, minLength){
@@ -145,6 +151,7 @@ AR.Detector.prototype.findMarkers = function(imageSrc, candidates, warpSize){
   
     CV.threshold(this.homography, this.homography, CV.otsu(this.homography) );
 
+    console.log("Candidate: " + i);
     marker = this.getMarker(this.homography, candidate);
     if (marker){
       markers.push(marker);
@@ -155,11 +162,15 @@ AR.Detector.prototype.findMarkers = function(imageSrc, candidates, warpSize){
 };
 
 AR.Detector.prototype.getMarker = function(imageSrc, candidate){
-  var width = (imageSrc.width / 7) >>> 0,
+  //var width = (imageSrc.width / 7) >>> 0,
+  var width = (imageSrc.width / markerSize) >>> 0,
       minZero = (width * width) >> 1,
       bits = [], rotations = [], distances = [],
       square, pair, inc, i, j;
 
+  //This loop counts the number of nonblack (white) square on the marker and checks that they are at least minZero
+  //For BitSign markers it has been temporary disabled since it would everytime return null
+  /*
   for (i = 0; i < 7; ++ i){
     inc = (0 === i || 6 === i)? 1: 6;
     
@@ -170,16 +181,28 @@ AR.Detector.prototype.getMarker = function(imageSrc, candidate){
       }
     }
   }
+  */
 
-  for (i = 0; i < 5; ++ i){
+  //for (i = 0; i < 5; ++ i){
+  for (i = 0; i < markerDataSize; ++ i){
     bits[i] = [];
 
-    for (j = 0; j < 5; ++ j){
+    for (j = 0; j < markerDataSize; ++ j){
       square = {x: (j + 1) * width, y: (i + 1) * width, width: width, height: width};
       
-      bits[i][j] = CV.countNonZero(imageSrc, square) > minZero? 1: 0;
+      //Since we are using negative markers we have to count black as white and vice versa
+      //bits[i][j] = CV.countNonZero(imageSrc, square) > minZero? 1: 0;
+      bits[i][j] = CV.countNonZero(imageSrc, square) > minZero? 0: 1;
     }
   }
+  
+  //Print bits matrix on console
+  console.log("Bits Matrix:");
+  for (i = 0; i < bits.length; i++){
+    console.log(bits[i]);
+  }
+
+  //From here on code and indexes must be fixed
 
   rotations[0] = bits;
   distances[0] = this.hammingDistance( rotations[0] );
